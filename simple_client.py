@@ -1,8 +1,10 @@
-#!/usr/bin/env python
-#-*-coding:utf8-*-
+#!/usr/bin/env Python
+# -*- coding:utf-8 -*-
 
-import beanstalkc
 import json
+import sys
+import time
+import beanstalkc
 from ConfigParser import ConfigParser
 
 class beanstalkClient(object):
@@ -12,47 +14,43 @@ class beanstalkClient(object):
         self.cf.read(conf_path)
         self.localhost = self.cf.get("beanstalk","localhost")
         self.port = self.cf.get("beanstalk","port")
-        self.pull_count = self.cf.get("beanstalk","count")
-
+        self.wait_query = self.cf.get("beanstalk","wait_query")
 
     def connect(self):
         try:
-            self.bstk = beanstalkc.Connection(host=self.localhost, port=self.port)
+            self.bstk = beanstalkc.Connection(host=self.localhost, port=int(self.port))
         except Exception,err:
             print err
             return False
         return True
 
-    def put(self,message,bar):
-        try:
-            if self.connect():
-                self.bstk.watch(bar)
-                self.bstk.put(message)
-                return True
-            return False
-        except Exception,err:
-            print err
-            return False
+    def put(self,message):
+        self.bstk.put(message)
 
-    def pull(self,bar,bury = True,delete=False,pull_limit = self.pull_count):
-        try:
-            results = []
-            if self.connect():
-                for i in range(pull_limit):
-                    self.bstk.watch(bar)
-                    job = self.bstk.reserve()
-                    result = job.body
-                    result = json.loads(result)
-                    results.append(result)
+    
+    def use(self,bar):
+        self.bstk.use(bar)
+
+    def pull(self,bar,runFunc,bury = False,delete=True):
+        # try:
+        results = []
+        while True:
+            self.bstk.watch(bar)
+            job = self.bstk.reserve(1)
+            if job == None:
+                time.sleep(int(self.wait_query))
+            else:
+                result = json.loads(job.body)
+                runFunc(result)
                 if bury:
                     job.bury()
                     job.kick()
                 if delete:
                     job.delete()
-            return results
-        except Exception, e:
-            print e
-            return False
+        return results
+        # except Exception, e:
+        #     print e
+        #     return False
 
     def __del__(self):
         if self.bstk in locals():
