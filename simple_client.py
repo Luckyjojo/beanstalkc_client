@@ -7,9 +7,6 @@ import time
 import beanstalkc
 from ConfigParser import ConfigParser
 
-from lib.send import send
-
-
 class beanstalkClient(object):
     """beanstalk client operation"""
 
@@ -19,7 +16,6 @@ class beanstalkClient(object):
         self.localhost = self.cf.get("beanstalkd","localhost")
         self.port = self.cf.get("beanstalkd","port")
         self.wait_query = self.cf.get("beanstalkd","wait_query")
-        self.sd = send()
 
     def connect(self):
         try:
@@ -44,7 +40,7 @@ class beanstalkClient(object):
                 time.sleep(int(self.wait_query))
             else:
                 result = json.loads(job.body)
-                response = runFunc(result)
+                response = runFunc(result)    # response follows RESTful API style
                 if response.get('error'):
                     job.bury()
                     job.kick()
