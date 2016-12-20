@@ -7,51 +7,49 @@ import time
 import beanstalkc
 from ConfigParser import ConfigParser
 
+from lib.send import send
+
+
 class beanstalkClient(object):
-    """docstring for message"""
+    """beanstalk client operation"""
+
     def __init__(self,conf_path):
         self.cf = ConfigParser()
         self.cf.read(conf_path)
-        self.localhost = self.cf.get("beanstalk","localhost")
-        self.port = self.cf.get("beanstalk","port")
-        self.wait_query = self.cf.get("beanstalk","wait_query")
+        self.localhost = self.cf.get("beanstalkd","localhost")
+        self.port = self.cf.get("beanstalkd","port")
+        self.wait_query = self.cf.get("beanstalkd","wait_query")
+        self.sd = send()
 
     def connect(self):
         try:
             self.bstk = beanstalkc.Connection(host=self.localhost, port=int(self.port))
         except Exception,err:
-            print err
             return False
         return True
 
     def put(self,message):
+        if not isinstance(message,str):
+            message = json.dumps(message)
         self.bstk.put(message)
-
     
     def use(self,bar):
         self.bstk.use(bar)
 
     def pull(self,bar,runFunc,bury = False,delete=True):
-        # try:
-        results = []
         while True:
             self.bstk.watch(bar)
-            job = self.bstk.reserve(1)
+            job = self.bstk.reserve(0)
             if job == None:
                 time.sleep(int(self.wait_query))
             else:
                 result = json.loads(job.body)
-                runFunc(result)
-                if bury:
+                response = runFunc(result)
+                if response.get('error'):
                     job.bury()
                     job.kick()
-                if delete:
+                else:
                     job.delete()
-        return results
-        # except Exception, e:
-        #     print e
-        #     return False
 
-    def __del__(self):
-        if self.bstk in locals():
-            self.bstk.close()
+    def close():
+        self.bstk.close()
