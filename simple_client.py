@@ -56,5 +56,5 @@ class beanstalkClient(object):
                 if delete:
                     job.delete()
 
-    def close():
+    def close(self):
         self.bstk.close()
